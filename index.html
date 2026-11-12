@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>球队记账系统</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
+<style>
+:root{--p:#1a73e8;--pd:#155ab6;--bg:#f5f7fa;--card:#fff;--text:#1a1a2e;--muted:#6b7280;--danger:#e11d48;--success:#059669;--border:#e5e7eb;--radius:12px;--shadow:0 2px 8px rgba(0,0,0,.08)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);line-height:1.5;min-height:100vh;padding-bottom:70px}
+button{border:none;background:none;cursor:pointer;font:inherit}
+input,select,textarea{font:inherit;border:1px solid var(--border);border-radius:8px;padding:10px 12px;width:100%;background:#fff}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--p)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:10px 8px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
+th{background:#f9fafb;font-weight:600;color:var(--muted);font-size:12px}
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);margin:12px 0;overflow:hidden}
+.card-h{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.card-t{font-size:16px;font-weight:600}
+.card-b{padding:14px 16px}
+.btn{display:inline-flex;align-items:center;padding:10px 16px;border-radius:8px;font-weight:500;transition:.15s}
+.btn-p{background:var(--p);color:#fff}.btn-p:active{background:var(--pd)}
+.btn-s{background:#eef2ff;color:var(--p)}
+.btn-d{background:#fee2e2;color:var(--danger)}
+.btn-sm{padding:6px 10px;font-size:13px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.col{flex:1;min-width:130px}
+.tabs{display:flex;background:#f1f3f5;border-radius:var(--radius);padding:4px;margin:12px 0}
+.tab{flex:1;padding:10px 4px;text-align:center;border-radius:8px;font-weight:500;color:var(--muted);font-size:14px}
+.tab.active{background:var(--p);color:#fff}
+.badge{display:inline-flex;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600}
+.b-member{background:#dbeafe;color:#1e40af}.b-goalkeeper{background:#fef3c7;color:#92400e}.b-coach{background:#dcfce7;color:#166534}.b-youth{background:#f3e8ff;color:#7c3aed}.b-casual{background:#f1f5f9;color:#475569}
+.b-paid{background:#dcfce7;color:#166534}.b-unpaid{background:#fee2e2;color:#e11d48}.b-absent{background:#f1f5f9;color:#64748b}
+.empty{text-align:center;padding:30px;color:var(--muted)}
+.wrap{max-width:860px;margin:0 auto;padding:0 12px}
+.modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:100;padding:16px}
+.modal-ov.open{display:flex}
+.modal{background:#fff;border-radius:16px;max-width:520px;width:100%;max-height:88vh;overflow:auto}
+.modal-h{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#fff}
+.modal-b{padding:16px}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1f2937;color:#fff;padding:12px 24px;border-radius:12px;z-index:200;opacity:0;transition:.3s;pointer-events:none}
+.toast.show{opacity:1}
+.stat{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+.stat .card-b{padding:10px 12px}
+.stat .lbl{font-size:12px;color:var(--muted)}
+.stat .val{font-size:18px;font-weight:700}
+h2.sec{font-size:15px;color:var(--muted);margin:16px 0 8px}
+.hint{font-size:12px;color:var(--muted);margin-top:6px}
+.sync-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#9ca3af;margin-right:6px}
+.sync-dot.ok{background:var(--success)}
+.sync-dot.err{background:var(--danger)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header style="display:flex;align-items:center;justify-content:space-between;padding:14px 0 6px">
+  <h1 style="font-size:20px">⚽ 球队记账</h1>
+  <div style="display:flex;align-items:center;gap:8px">
+    <span id="syncStatus" style="font-size:12px;color:var(--muted)"><i class="sync-dot" id="syncDot"></i><span id="syncText">本地模式</span></span>
+    <button id="btnSync" class="btn btn-s btn-sm">同步</button>
+  </div>
+</header>
+
+<div class="stat">
+  <div class="card"><div class="card-b"><div class="lbl">下一场</div><div class="val" id="statNext" style="font-size:14px">—</div></div></div>
+  <div class="card"><div class="card-b"><div class="lbl">球队余额</div><div class="val" id="statBal">¥0</div></div></div>
+  <div class="card"><div class="card-b"><div class="lbl">到场人数(近场)</div><div class="val" id="statAtt">—</div></div></div>
+</div>
+
+<nav class="tabs">
+  <button class="tab active" data-tab="players">👥 名册</button>
+  <button class="tab" data-tab="matches">📅 场次</button>
+  <button class="tab" data-tab="signups">📝 报名</button>
+  <button class="tab" data-tab="ledger">💰 账本</button>
+  <button class="tab" data-tab="settings">⚙️ 设置</button>
+</nav>
+
+<!-- 名册 -->
+<section id="tab-players">
+  <div class="card">
+    <div class="card-h"><span class="card-t">球员名册</span>
+      <div class="row" style="gap:6px">
+        <button id="btnImportRoster" class="btn btn-s btn-sm">导入Excel</button>
+        <button id="btnAddPlayer" class="btn btn-p btn-sm">+ 添加</button>
+      </div>
+    </div>
+    <div class="card-b" style="overflow-x:auto">
+      <table><thead><tr><th>姓名</th><th>类别</th><th>球衣</th><th>月费</th><th>余额</th><th>备注</th><th></th></tr></thead>
+      <tbody id="playersBody"></tbody></table>
+      <div class="empty" id="playersEmpty">名册为空 — 点右上角「添加」或「导入Excel」</div>
+    </div>
+  </div>
+</section>
+
+<!-- 场次 -->
+<section id="tab-matches" hidden>
+  <div class="card">
+    <div class="card-h"><span class="card-t">场次记录</span>
+      <button id="btnAddMatch" class="btn btn-p btn-sm">+ 新建场次</button>
+    </div>
+    <div class="card-b" style="overflow-x:auto">
+      <table><thead><tr><th>日期</th><th>场地</th><th>类型</th><th>场地费</th><th>报名</th><th>人均</th><th></th></tr></thead>
+      <tbody id="matchesBody"></tbody></table>
+      <div class="empty" id="matchesEmpty">暂无场次</div>
+    </div>
+    <div class="card-b hint">分摊规则：纯 AA = 场地费 ÷ 付费人头（教练、小队员免单）；门将、散客与会员同价</div>
+  </div>
+</section>
+
+<!-- 报名 -->
+<section id="tab-signups" hidden>
+  <div class="card">
+    <div class="card-h"><span class="card-t">报名 / 分摊</span></div>
+    <div class="card-b">
+      <div class="row" style="margin-bottom:10px">
+        <select id="selMatch" class="col"></select>
+        <button id="btnParse" class="btn btn-p btn-sm">粘贴接龙报名</button>
+        <button id="btnGenFee" class="btn btn-s btn-sm">重算分摊</button>
+      </div>
+      <div id="signupList"></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-h"><span class="card-t">本场小结</span></div>
+    <div class="card-b" id="matchSummary">选一场次查看</div>
+  </div>
+</section>
+
+<!-- 账本 -->
+<section id="tab-ledger" hidden>
+  <div class="card">
+    <div class="card-h"><span class="card-t">收支台账</span>
+      <button id="btnAddLedger" class="btn btn-p btn-sm">+ 记一笔</button>
+    </div>
+    <div class="card-b" style="overflow-x:auto">
+      <table><thead><tr><th>日期</th><th>类型</th><th>类别</th><th>金额</th><th>备注</th><th></th></tr></thead>
+      <tbody id="ledgerBody"></tbody></table>
+      <div class="empty" id="ledgerEmpty">暂无流水</div>
+    </div>
+    <div class="card-b hint">球队余额 = 收入合计 − 支出合计（收入：会费/球衣费/散客费；支出：场地费）</div>
+  </div>
+</section>
+
+<!-- 设置 -->
+<section id="tab-settings" hidden>
+  <div class="card">
+    <div class="card-h"><span class="card-t">Supabase 连接</span></div>
+    <div class="card-b">
+      <div class="row" style="margin-bottom:8px"><input id="cfgUrl" class="col" placeholder="https://lzbzjatnijhuvkcjpdab.supabase.co"><input id="cfgKey" class="col" placeholder="anon public key (eyJ...)"></div>
+      <button id="btnSaveCfg" class="btn btn-p" style="width:100%">保存并连接</button>
+      <div class="hint" id="cfgMsg"></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-h"><span class="card-t">分摊参数</span></div>
+    <div class="card-b">
+      <div class="row"><label class="col">整场场地费<input id="cfgFull" type="number" value="1700"></label>
+      <label class="col">半场场地费<input id="cfgHalf" type="number" value="800"></label></div>
+      <div class="hint">免单类别固定：教练、小队员；门将、散客与会员同价 AA；未来会员价 70/场（暂不启用）</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-h"><span class="card-t">数据备份</span></div>
+    <div class="card-b row">
+      <button id="btnExportAll" class="btn btn-s" style="flex:1">导出全部数据(JSON)</button>
+      <button id="btnImportAll" class="btn btn-s" style="flex:1">导入备份(JSON)</button>
+      <input type="file" id="fileJson" accept=".json" style="display:none">
+    </div>
+  </div>
+</section>
+</div>
+
+<!-- 弹窗：球员 -->
+<div class="modal-ov" id="mPlayer">
+  <div class="modal"><div class="modal-h"><b>球员信息</b><button onclick="hide('mPlayer')">✕</button></div>
+  <div class="modal-b">
+    <input type="hidden" id="pId">
+    <div class="row" style="margin-bottom:8px"><input id="pName" class="col" placeholder="姓名*"><input id="pWechat" class="col" placeholder="微信名"></div>
+    <div class="row" style="margin-bottom:8px">
+      <select id="pCat" class="col"><option value="member">会员</option><option value="goalkeeper">门将</option><option value="coach">教练</option><option value="youth">小队员</option><option value="casual">散客</option></select>
+      <input id="pNo" class="col" type="number" placeholder="球衣号">
+    </div>
+    <div class="row" style="margin-bottom:8px">
+      <input id="pSize" class="col" placeholder="球衣尺码">
+      <input id="pFee" class="col" type="number" placeholder="月费(元)">
+    </div>
+    <input id="pNote" placeholder="备注（欠款/垫付等）">
+    <div class="row" style="margin-top:12px;justify-content:flex-end"><button class="btn btn-s" onclick="hide('mPlayer')">取消</button><button class="btn btn-p" id="btnSavePlayer">保存</button></div>
+  </div></div>
+</div>
+
+<!-- 弹窗：场次 -->
+<div class="modal-ov" id="mMatch">
+  <div class="modal"><div class="modal-h"><b>场次信息</b><button onclick="hide('mMatch')">✕</button></div>
+  <div class="modal-b">
+    <input type="hidden" id="mId">
+    <div class="row" style="margin-bottom:8px"><input id="mDate" class="col" type="date"><input id="mVenue" class="col" placeholder="场地"></div>
+    <div class="row" style="margin-bottom:8px">
+      <select id="mType" class="col"><option value="full">整场</option><option value="half">半场</option></select>
+      <input id="mFee" class="col" type="number" placeholder="场地费(元)">
+    </div>
+    <input id="mNote" placeholder="备注">
+    <div class="row" style="margin-top:12px;justify-content:flex-end"><button class="btn btn-s" onclick="hide('mMatch')">取消</button><button class="btn btn-p" id="btnSaveMatch">保存</button></div>
+  </div></div>
+</div>
+
+<!-- 弹窗：记账 -->
+<div class="modal-ov" id="mLedger">
+  <div class="modal"><div class="modal-h"><b>记一笔</b><button onclick="hide('mLedger')">✕</button></div>
+  <div class="modal-b">
+    <div class="row" style="margin-bottom:8px">
+      <select id="lType" class="col"><option value="income">收入</option><option value="expense">支出</option></select>
+      <select id="lCat" class="col"><option value="membership">会费</option><option value="jersey">球衣费</option><option value="court_fee">场地费</option><option value="casual_fee">散客费</option><option value="other">其他</option></select>
+    </div>
+    <div class="row" style="margin-bottom:8px"><input id="lAmt" class="col" type="number" placeholder="金额(元)"><input id="lDate" class="col" type="date"></div>
+    <input id="lNote" placeholder="备注">
+    <div class="row" style="margin-top:12px;justify-content:flex-end"><button class="btn btn-s" onclick="hide('mLedger')">取消</button><button class="btn btn-p" id="btnSaveLedger">记账</button></div>
+  </div></div>
+</div>
+
+<!-- 弹窗：接龙解析 -->
+<div class="modal-ov" id="mParse">
+  <div class="modal"><div class="modal-h"><b>粘贴微信接龙</b><button onclick="hide('mParse')">✕</button></div>
+  <div class="modal-b">
+    <textarea id="txtJielong" rows="8" placeholder="粘贴接龙文本，每行一个名字，支持：&#10;1. 张三&#10;2. 李四（门将）&#10;3. 王五 请假&#10;自动跳过：请假/缺席/不到"></textarea>
+    <div class="hint" id="parseHint">解析后与名册模糊匹配，未匹配的会提示。</div>
+    <div class="row" style="margin-top:12px;justify-content:flex-end"><button class="btn btn-s" onclick="hide('mParse')">取消</button><button class="btn btn-p" id="btnDoParse">解析并报名</button></div>
+  </div></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="vendor/supabase.js"></script>
+<script src="vendor/xlsx.full.min.js"></script>
+<script>
+'use strict';
+/* ===== 常量 ===== */
+const CAT={member:'会员',goalkeeper:'门将',coach:'教练',youth:'小队员',casual:'散客'};
+const CATC={member:'b-member',goalkeeper:'b-goalkeeper',coach:'b-coach',youth:'b-youth',casual:'b-casual'};
+const ST={signed_up:'已报名',attended:'已到场',absent:'缺席'};
+const STC={signed_up:'b-member',attended:'b-paid',absent:'b-absent'};
+const FREE_CAT=['coach','youth'];
+const LS='team_accounting_v1';
+const $=(s,c=document)=>c.querySelector(s);
+const $$=(s,c=document)=>[...c.querySelectorAll(s)];
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money=c=>('¥'+(Math.abs(c)/100).toFixed(2)).replace(/\B(?=(\d{3})+(?!\d))/g,',');
+const yuan=v=>Math.round(parseFloat(v||0)*100);
+const today=()=>new Date().toISOString().slice(0,10);
+const uid=()=>crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2);
+function toast(m,ms=2200){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),ms)}
+function show(id){$('#'+id).classList.add('open')}
+function hide(id){$('#'+id).classList.remove('open')}
+
+/* ===== 状态 ===== */
+const S={players:[],matches:[],signups:[],ledger:[],cfg:{full:1700,half:800},curMatch:null,sb:null,online:false};
+
+/* ===== 本地持久化 ===== */
+function save(){localStorage.setItem(LS,JSON.stringify({players:S.players,matches:S.matches,signups:S.signups,ledger:S.ledger,cfg:S.cfg}))}
+function load(){try{const d=JSON.parse(localStorage.getItem(LS)||'{}');Object.assign(S,{players:d.players||[],matches:d.matches||[],signups:d.signups||[],ledger:d.ledger||[],cfg:d.cfg||{full:1700,half:800}})}catch(e){console.warn(e)}}
+
+/* ===== Supabase（可选） ===== */
+async function initSupabase(){
+  const url=localStorage.getItem('sb_url'),key=localStorage.getItem('sb_key');
+  if(!url||!key||typeof supabase==='undefined'){setSync(false,'本地模式');return}
+  try{
+    S.sb=window.supabase.createClient(url,key);
+    const{error}=await S.sb.from('players').select('id').limit(1);
+    if(error)throw error;
+    S.online=true;setSync(true,'已连接 Supabase');
+  }catch(e){S.online=false;setSync(false,'连接失败：'+e.message.slice(0,40))}
+}
+function setSync(ok,txt){$('#syncDot').className='sync-dot '+(ok?'ok':'err');$('#syncText').textContent=txt}
+async function sbUpsert(table,row){const{error}=await S.sb.from(table).upsert(row);if(error)throw error}
+async function sbDelete(table,id){const{error}=await S.sb.from(table).delete().eq('id',id);if(error)throw error}
+async function syncPush(){
+  if(!S.online){save();return}
+  try{
+    await Promise.all([
+      S.sb.from('players').upsert(S.players),
+      S.sb.from('matches').upsert(S.matches),
+      S.sb.from('signups').upsert(S.signups),
+      S.sb.from('ledger').upsert(S.ledger),
+    ]);
+    save();toast('已同步到 Supabase');
+  }catch(e){toast('同步失败：'+e.message.slice(0,60))}
+}
+async function syncPull(){
+  if(!S.online){toast('未连接 Supabase，仅本地');save();renderAll();return}
+  try{
+    toast('拉取中...',800);
+    const[p,m,s,l]=await Promise.all([
+      S.sb.from('players').select('*'),S.sb.from('matches').select('*'),
+      S.sb.from('signups').select('*'),S.sb.from('ledger').select('*')]);
+    if(p.error)throw p.error;if(m.error)throw m.error;if(s.error)throw s.error;if(l.error)throw l.error;
+    S.players=p.data;S.matches=m.data;S.signups=s.data;S.ledger=l.data;
+    save();renderAll();toast('拉取完成：'+S.players.length+' 球员');
+  }catch(e){toast('拉取失败：'+e.message.slice(0,60))}
+}
+
+/* ===== 计算：纯 AA 分摊 ===== */
+function payersOf(matchId){
+  const sSet=new Set(S.signups.filter(x=>x.match_id===matchId&&x.status!=='absent').map(x=>x.player_id));
+  return S.players.filter(p=>sSet.has(p.id)&&!FREE_CAT.includes(p.category));
+}
+function perHead(match){
+  const n=payersOf(match.id).length;
+  return n?Math.round((match.court_fee||0)/n):0;
+}
+
+/* ===== 渲染 ===== */
+function renderPlayers(){
+  const tb=$('#playersBody');const list=[...S.players].sort((a,b)=>(a.category||'').localeCompare(b.category||''));
+  tb.innerHTML=list.map(p=>`<tr><td><b>${esc(p.name)}</b>${p.wechat_name?'<br><small style="color:var(--muted)">'+esc(p.wechat_name)+'</small>':''}</td>
+  <td><span class="badge ${CATC[p.category]||'b-casual'}">${CAT[p.category]||p.category||'—'}</span></td>
+  <td>${p.jersey_number??'—'}</td>
+  <td>${p.monthly_fee?('¥'+(p.monthly_fee/100)):'—'}</td>
+  <td>${p.balance<0?'<span class="badge b-unpaid">欠'+money(p.balance)+'</span>':p.balance>0?'<span class="badge b-paid">余'+money(p.balance)+'</span>':'—'}</td>
+  <td>${esc(p.debt_note||'')}</td>
+  <td><button class="btn btn-s btn-sm" onclick="editPlayer('${p.id}')">改</button> <button class="btn btn-d btn-sm" onclick="delPlayer('${p.id}')">删</button></td></tr>`).join('');
+  $('#playersEmpty').style.display=list.length?'none':'block';
+}
+function renderMatches(){
+  const tb=$('#matchesBody');const list=[...S.matches].sort((a,b)=>b.date.localeCompare(a.date));
+  tb.innerHTML=list.map(m=>{
+    const signed=S.signups.filter(x=>x.match_id===m.id&&x.status!=='absent').length;
+    const attended=S.signups.filter(x=>x.match_id===m.id&&x.status==='attended').length;
+    return `<tr><td>${m.date}</td><td>${esc(m.venue||'')}</td><td>${m.is_full_court?'整场':'半场'}</td>
+    <td>${money(m.court_fee)}</td><td>${signed}人</td><td>${attended?'到场'+attended:perHead(m)?money(perHead(m))+'/人':'—'}</td>
+    <td><button class="btn btn-s btn-sm" onclick="openSignups('${m.id}')">报名</button> <button class="btn btn-s btn-sm" onclick="editMatch('${m.id}')">改</button> <button class="btn btn-d btn-sm" onclick="delMatch('${m.id}')">删</button></td></tr>`}).join('');
+  $('#matchesEmpty').style.display=list.length?'none':'block';
+}
+function renderSignups(){
+  const sel=$('#selMatch');
+  sel.innerHTML='<option value="">— 选择场次 —</option>'+[...S.matches].sort((a,b)=>b.date.localeCompare(a.date))
+    .map(m=>`<option value="${m.id}" ${m.id===S.curMatch?'selected':''}>${m.date} ${m.is_full_court?'整场':'半场'} ${esc(m.venue||'')}</option>`).join('');
+  const box=$('#signupList');
+  if(!S.curMatch){box.innerHTML='<div class="empty">先在「场次」新建，或从上面选择一场</div>';$('#matchSummary').textContent='选一场次查看';return}
+  const m=S.matches.find(x=>x.id===S.curMatch);if(!m){box.innerHTML='';return}
+  const rows=S.signups.filter(x=>x.match_id===S.curMatch);
+  const ph=perHead(m);
+  box.innerHTML=`<table><thead><tr><th>球员</th><th>类别</th><th>状态</th><th>应付</th><th>实收</th><th></th></tr></thead><tbody>`+
+    rows.map(x=>{const p=S.players.find(q=>q.id===x.player_id)||{name:'?',category:'casual'};
+      return `<tr><td><b>${esc(p.name)}</b></td><td><span class="badge ${CATC[p.category]||'b-casual'}">${CAT[p.category]||''}</span></td>
+      <td><button class="btn btn-s btn-sm" onclick="cycleStatus('${x.id}')">${ST[x.status]||x.status}</button></td>
+      <td>${FREE_CAT.includes(p.category)?'<span class="badge b-coach">免单</span>':money(ph)}</td>
+      <td>${x.fee_paid?money(x.fee_paid):'—'}</td>
+      <td><button class="btn btn-s btn-sm" onclick="markPaid('${x.id}')">收${money(ph)}</button></td></tr>`}).join('')+'</tbody></table>';
+  // 小结
+  const att=rows.filter(x=>x.status==='attended');
+  const payN=att.filter(x=>{const p=S.players.find(q=>q.id===x.player_id);return p&&!FREE_CAT.includes(p.category)}).length;
+  const total=att.length*ph;
+  $('#matchSummary').innerHTML=`到场 <b>${att.length}</b> 人（付费 <b>${payN}</b> 人，教练/小队员免单）· 人均 <b>${money(ph)}</b> · 应收合计 <b>${money(payN*ph)}</b> · 场地费 ${money(m.court_fee)} · 差额 <b style="color:${payN*ph>=m.court_fee?'var(--success)':'var(--danger)'}">${money(payN*ph-m.court_fee)}</b>`;
+}
+function renderLedger(){
+  const tb=$('#ledgerBody');const list=[...S.ledger].sort((a,b)=>b.date.localeCompare(a.date));
+  tb.innerHTML=list.map(l=>`<tr><td>${l.date}</td><td><span class="badge ${l.type==='income'?'b-paid':'b-unpaid'}">${l.type==='income'?'收':'支'}</span></td>
+  <td>${esc(l.category)}</td><td style="color:${l.type==='income'?'var(--success)':'var(--danger)'}">${l.type==='income'?'+':'−'}${money(l.amount)}</td>
+  <td>${esc(l.note||'')}</td><td><button class="btn btn-d btn-sm" onclick="delLedger('${l.id}')">删</button></td></tr>`).join('');
+  $('#ledgerEmpty').style.display=list.length?'none':'block';
+}
+function renderStats(){
+  const income=S.ledger.filter(l=>l.type==='income').reduce((s,l)=>s+l.amount,0);
+  const exp=S.ledger.filter(l=>l.type==='expense').reduce((s,l)=>s+l.amount,0);
+  $('#statBal').textContent=money(income-exp);
+  $('#statBal').style.color=income-exp>=0?'var(--success)':'var(--danger)';
+  const up=[...S.matches].filter(m=>m.date>=today()).sort((a,b)=>a.date.localeCompare(b.date))[0];
+  $('#statNext').textContent=up?up.date+(up.is_full_court?' 整':' 半'):'—';
+  const last=[...S.matches].sort((a,b)=>b.date.localeCompare(a.date))[0];
+  $('#statAtt').textContent=last?(S.signups.filter(x=>x.match_id===last.id&&x.status==='attended').length||'—')+'人':'—';
+}
+function renderAll(){renderPlayers();renderMatches();renderSignups();renderLedger();renderStats()}
+
+/* ===== Tab ===== */
+$$('.tab').forEach(t=>t.onclick=()=>{
+  $$('.tab').forEach(x=>x.classList.remove('active'));t.classList.add('active');
+  $$('section[id^=tab-]').forEach(s=>s.hidden=s.id!=='tab-'+t.dataset.tab);
+});
+
+/* ===== 球员 CRUD ===== */
+function openPlayer(p){$('#pId').value=p?.id||'';$('#pName').value=p?.name||'';$('#pWechat').value=p?.wechat_name||'';$('#pCat').value=p?.category||'member';$('#pNo').value=p?.jersey_number||'';$('#pSize').value=p?.jersey_size||'';$('#pFee').value=p?.monthly_fee!=null?p.monthly_fee/100:'';$('#pNote').value=p?.debt_note||'';show('mPlayer')}
+function savePlayer(){
+  const id=$('#pId').value,name=$('#pName').value.trim();
+  if(!name){toast('姓名必填');return}
+  const row={id:id||uid(),name,wechat_name:$('#pWechat').value.trim(),category:$('#pCat').value,
+    jersey_number:$('#pNo').value?+$('#pNo').value:null,jersey_size:$('#pSize').value.trim(),
+    monthly_fee:$('#pFee').value?yuan($('#pFee').value):0,debt_note:$('#pNote').value.trim(),
+    balance:S.players.find(p=>p.id===id)?.balance||0};
+  const i=S.players.findIndex(p=>p.id===row.id);
+  if(i>=0)S.players[i]=row;else S.players.push(row);
+  hide('mPlayer');save();syncPush().catch(()=>{});renderPlayers();toast('已保存');
+}
+function editPlayer(id){openPlayer(S.players.find(p=>p.id===id))}
+function delPlayer(id){if(!confirm('删除该球员？其报名记录保留'))return;S.players=S.players.filter(p=>p.id!==id);save();syncPush().catch(()=>{});sbDelete('players',id).catch(()=>{});renderPlayers()}
+
+/* ===== 场次 CRUD ===== */
+function openMatch(m){$('#mId').value=m?.id||'';$('#mDate').value=m?.date||today();$('#mVenue').value=m?.venue||'';$('#mType').value=m?(m.is_full_court?'full':'half'):'full';$('#mFee').value=m?.court_fee?m.court_fee/100:($('#mType').value==='full'?1700:800);$('#mNote').value=m?.note||'';show('mMatch')}
+function saveMatch(){
+  const id=$('#mId').value,date=$('#mDate').value;
+  if(!date){toast('日期必填');return}
+  const row={id:id||uid(),date,venue:$('#mVenue').value.trim(),is_full_court:$('#mType').value==='full',
+    court_fee:$('#mFee').value?yuan($('#mFee').value):( $('#mType').value==='full'?170000:80000),note:$('#mNote').value.trim()};
+  const i=S.matches.findIndex(m=>m.id===row.id);
+  if(i>=0)S.matches[i]=row;else S.matches.push(row);
+  S.curMatch=row.id;hide('mMatch');save();syncPush().catch(()=>{});renderAll();toast('已保存');
+}
+function editMatch(id){openMatch(S.matches.find(m=>m.id===id))}
+function delMatch(id){if(!confirm('删除该场次及其报名？'))return;S.matches=S.matches.filter(m=>m.id!==id);S.signups=S.signups.filter(s=>s.match_id!==id);save();syncPush().catch(()=>{});renderAll()}
+
+/* ===== 报名/分摊 ===== */
+function openSignups(id){S.curMatch=id;$$('.tab').forEach(x=>x.classList.remove('active'));$('[data-tab=signups]').classList.add('active');$$('section[id^=tab-]').forEach(s=>s.hidden=s.id!=='tab-signups');renderSignups();window.scrollTo(0,0)}
+function cycleStatus(sid){const s=S.signups.find(x=>x.id===sid);const arr=['signed_up','attended','absent'];s.status=arr[(arr.indexOf(s.status)+1)%3];save();syncPush().catch(()=>{});renderSignups()}
+function markPaid(sid){const s=S.signups.find(x=>x.id===sid);const m=S.matches.find(x=>x.id===s.match_id);const p=S.players.find(q=>q.id===s.player_id);const amt=p&&FREE_CAT.includes(p.category)?0:perHead(m);s.fee_paid=amt;s.status='attended';
+  // 写台账：散客费/会员单场费收入
+  if(amt>0)S.ledger.push({id:uid(),date:m.date,type:'income',category:p.category==='casual'?'casual_fee':'court_fee',amount:amt,related_id:m.id,note:p.name+' 单场费'});
+  save();syncPush().catch(()=>{});renderSignups();renderLedger();renderStats();toast('已收款 '+money(amt))}
+function parseJielong(){
+  const lines=$('#txtJielong').value.split('\n').map(x=>x.trim()).filter(Boolean);
+  const names=[];
+  for(const ln of lines){
+    let t=ln.replace(/^\d+[.、．)\s]*/,'').trim();
+    if(/请假|缺席|不到|不来|有事/.test(t)){continue}
+    t=t.replace(/[（(].*?[)）]/g,'').trim();
+    if(!t)continue;
+    names.push(t);
+  }
+  if(!names.length){toast('没解析到名字');return}
+  let matched=0,unmatched=[];
+  for(const nm of names){
+    // 精确 → 包含匹配
+    let p=S.players.find(x=>x.name===nm)||S.players.find(x=>x.wechat_name===nm)||S.players.find(x=>x.name.includes(nm)||nm.includes(x.name));
+    if(!p){unmatched.push(nm);continue}
+    matched++;
+    if(!S.signups.find(x=>x.match_id===S.curMatch&&x.player_id===p.id))
+      S.signups.push({id:uid(),match_id:S.curMatch,player_id:p.id,status:'signed_up',fee_paid:0});
+  }
+  hide('mParse');save();syncPush().catch(()=>{});renderSignups();
+  toast(`匹配成功 ${matched} 人`+(unmatched.length?`；未匹配：${unmatched.join('、')}（请到名册添加）`:''));
+}
+function genFees(){
+  if(!S.curMatch){toast('先选场次');return}
+  const m=S.matches.find(x=>x.id===S.curMatch);
+  const rows=S.signups.filter(x=>x.match_id===S.curMatch&&x.status!=='absent');
+  const n=rows.filter(x=>{const p=S.players.find(q=>q.id===x.player_id);return p&&!FREE_CAT.includes(p.category)}).length;
+  const ph=n?Math.round(m.court_fee/n):0;
+  rows.forEach(x=>{const p=S.players.find(q=>q.id===x.player_id);if(p&&!FREE_CAT.includes(p.category))x.fee_due=ph;else x.fee_due=0});
+  save();syncPush().catch(()=>{});renderSignups();toast(`人均 ${money(ph)}（${n} 个付费人头）`);
+}
+
+/* ===== 账本 ===== */
+function openLedger(){ $('#lType').value='income';$('#lCat').value='membership';$('#lAmt').value='';$('#lDate').value=today();$('#lNote').value='';show('mLedger')}
+function saveLedger(){
+  const amt=yuan($('#lAmt').value);
+  if(!amt){toast('金额必填');return}
+  S.ledger.push({id:uid(),date:$('#lDate').value||today(),type:$('#lType').value,category:$('#lCat').value,amount:amt,note:$('#lNote').value.trim()});
+  hide('mLedger');save();syncPush().catch(()=>{});renderLedger();renderStats();toast('已记账');
+}
+function delLedger(id){if(!confirm('删除这条流水？'))return;S.ledger=S.ledger.filter(l=>l.id!==id);save();syncPush().catch(()=>{});renderLedger();renderStats()}
+
+/* ===== 导入名册 Excel ===== */
+function importRosterExcel(){
+  const inp=document.createElement('input');inp.type='file';inp.accept='.xlsx,.csv';
+  inp.onchange=e=>{const f=e.target.files[0];if(!f)return;
+    const rd=new FileReader();
+    rd.onload=ev=>{
+      try{
+        const wb=XLSX.read(ev.target.result,{type:'binary'});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+        let added=0;
+        for(const r of rows){
+          const name=(r['姓名']||r['name']||'').toString().trim();
+          if(!name)continue;
+          if(S.players.find(x=>x.name===name))continue;
+          const catRaw=(r['标签']||r['类别']||'member').toString();
+          const cat=catRaw.includes('门将')?'goalkeeper':catRaw.includes('教练')?'coach':catRaw.includes('小队员')?'youth':catRaw.includes('散客')?'casual':'member';
+          S.players.push({id:uid(),name,wechat_name:(r['微信名/接龙报名']||'').toString().trim(),category:cat,
+            jersey_number:r['球衣号码']?+r['球衣号码']:null,jersey_size:(r['球衣尺码']||'').toString(),
+            monthly_fee:cat==='member'?40000:cat==='goalkeeper'?20000:0,
+            balance:0,debt_note:''});
+          added++;
+        }
+        save();syncPush().catch(()=>{});renderPlayers();toast(`导入 ${added} 名新球员（重名跳过）`);
+      }catch(err){toast('解析失败：'+err.message)}
+    };
+    rd.readAsBinaryString(f);
+  };
+  inp.click();
+}
+function exportAllJson(){
+  const blob=new Blob([JSON.stringify({players:S.players,matches:S.matches,signups:S.signups,ledger:S.ledger},null,1)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='球队记账备份_'+today()+'.json';a.click();
+}
+function importAllJson(inp){
+  const f=inp.target.files[0];if(!f)return;
+  const rd=new FileReader();
+  rd.onload=e=>{try{const d=JSON.parse(e.target.result);Object.assign(S,{players:d.players||[],matches:d.matches||[],signups:d.signups||[],ledger:d.ledger||[]});save();renderAll();toast('恢复完成')}catch(err){toast('文件格式错误')}};
+  rd.readAsText(f);inp.target.value='';
+}
+
+/* ===== Supabase 配置 ===== */
+async function saveCfg(){
+  const url=$('#cfgUrl').value.trim().replace(/\/$/,''),key=$('#cfgKey').value.trim();
+  if(!url||!key){toast('两项都要填');return}
+  localStorage.setItem('sb_url',url);localStorage.setItem('sb_key',key);
+  await initSupabase();
+  if(S.online)await syncPull();
+}
+
+/* ===== 事件绑定 ===== */
+$('#btnAddPlayer').onclick=()=>openPlayer();
+$('#btnSavePlayer').onclick=savePlayer;
+$('#btnAddMatch').onclick=()=>openMatch();
+$('#btnSaveMatch').onclick=saveMatch;
+$('#btnAddLedger').onclick=openLedger;
+$('#btnSaveLedger').onclick=saveLedger;
+$('#btnParse').onclick=()=>{if(!S.curMatch){toast('先在上方选择场次');return}show('mParse')};
+$('#btnDoParse').onclick=parseJielong;
+$('#btnGenFee').onclick=genFees;
+$('#btnImportRoster').onclick=importRosterExcel;
+$('#btnExportAll').onclick=exportAllJson;
+$('#btnImportAll').onchange=importAllJson;
+$('#btnSaveCfg').onclick=saveCfg;
+$('#btnSync').onclick=()=>{S.online?syncPull():saveCfg()};
+$('#mType').onchange=e=>{$('#mFee').value=e.target.value==='full'?1700:800};
+$('#selMatch').onchange=e=>{S.curMatch=e.target.value;renderSignups()};
+
+/* ===== 启动 ===== */
+(async function(){
+  load();
+  // 填配置框
+  $('#cfgUrl').value=localStorage.getItem('sb_url')||'';
+  $('#cfgKey').value=localStorage.getItem('sb_key')||'';
+  if(typeof supabase!=='undefined'&&localStorage.getItem('sb_url'))await initSupabase();
+  if(S.online)await syncPull();
+  renderAll();
+})();
+</script>
+</body>
+</html>
